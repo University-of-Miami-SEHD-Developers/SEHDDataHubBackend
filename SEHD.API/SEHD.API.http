@@ -1,0 +1,6 @@
+@SEHD.API_HostAddress = http://localhost:5145
+
+GET {{SEHD.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
