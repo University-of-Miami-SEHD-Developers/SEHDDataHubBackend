@@ -1,125 +1,200 @@
-﻿
+﻿// Controllers/AdmissionDataController.cs (Updated)
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SEHD.API.DTOs;
 using SEHD.API.Models;
-using System.Collections.Generic;
-using System.Linq;
+using SEHD.API.Services;
 
 namespace SEHD.API.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
+    [Authorize]
     public class AdmissionDataController : ControllerBase
     {
-        // Fix for IDE0044: Make field readonly
-        // Fix for IDE0028: Collection initialization can be simplified
-        private static readonly List<AdmissionData> _admissionData = new()
-        {
-            new AdmissionData
-            {
-                Id = 1,
-                AcademicCareerDescription = "Undergraduate",
-                AcademicPlanCode = "EXPS_BSEXP",
-                AcademicPlanDescription = "Exercise Physiology",
-                AdmitTypeDescription = "New Student",
-                Department = "KIN",
-                Program = "Bachelor's",
-                TotalApplied = 595,
-                TotalAdmitted = 124,
-                TotalDenied = 204,
-                TotalGrossDeposited = 41,
-                TotalNetDeposited = 38,
-                Term = "Fall24",
-                AcademicYear = "2023-24"
-            },
-            // Add more mock data here
-        };
+        private readonly IAdmissionService _admissionService;
+        private readonly ILogger<AdmissionDataController> _logger;
 
+        public AdmissionDataController(IAdmissionService admissionService, ILogger<AdmissionDataController> logger)
+        {
+            _admissionService = admissionService;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Get all admission data
+        /// </summary>
         [HttpGet]
-        public ActionResult<IEnumerable<AdmissionData>> GetAllAdmissionData()
+        public async Task<ActionResult<IEnumerable<AdmissionDataDto>>> GetAllAdmissionData()
         {
-            return Ok(_admissionData);
+            try
+            {
+                var data = await _admissionService.GetAllAdmissionDataAsync();
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all admission data");
+                return StatusCode(500, "Internal server error");
+            }
         }
 
-        [HttpGet("term/{term}")]
-        public ActionResult<IEnumerable<AdmissionData>> GetAdmissionDataByTerm(string term)
+        /// <summary>
+        /// Get admission data by term
+        /// </summary>
+        [HttpGet("term/{termCode}")]
+        public async Task<ActionResult<IEnumerable<AdmissionDataDto>>> GetAdmissionDataByTerm(string termCode)
         {
-            var data = _admissionData.Where(d => d.Term == term).ToList();
-            if (!data.Any())
-                return NotFound();
+            try
+            {
+                var data = await _admissionService.GetAdmissionDataByTermAsync(termCode);
+                if (!data.Any())
+                    return NotFound($"No data found for term: {termCode}");
 
-            return Ok(data);
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving admission data for term: {TermCode}", termCode);
+                return StatusCode(500, "Internal server error");
+            }
         }
 
+        /// <summary>
+        /// Get admission data by academic year
+        /// </summary>
         [HttpGet("academic-year/{academicYear}")]
-        public ActionResult<IEnumerable<AdmissionData>> GetAdmissionDataByAcademicYear(string academicYear)
+        public async Task<ActionResult<IEnumerable<AdmissionDataDto>>> GetAdmissionDataByAcademicYear(string academicYear)
         {
-            var data = _admissionData.Where(d => d.AcademicYear == academicYear).ToList();
-            if (!data.Any())
-                return NotFound();
+            try
+            {
+                var data = await _admissionService.GetAdmissionDataByAcademicYearAsync(academicYear);
+                if (!data.Any())
+                    return NotFound($"No data found for academic year: {academicYear}");
 
-            return Ok(data);
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving admission data for academic year: {AcademicYear}", academicYear);
+                return StatusCode(500, "Internal server error");
+            }
         }
 
+        /// <summary>
+        /// Filter admission data based on multiple criteria
+        /// </summary>
         [HttpGet("filter")]
-        public ActionResult<IEnumerable<AdmissionData>> FilterAdmissionData(
+        public async Task<ActionResult<IEnumerable<AdmissionDataDto>>> FilterAdmissionData(
             [FromQuery] string? term = null,
             [FromQuery] string? department = null,
             [FromQuery] string? program = null,
             [FromQuery] string? academicCareer = null,
             [FromQuery] string? admitType = null)
         {
-            var query = _admissionData.AsQueryable();
-
-            if (!string.IsNullOrEmpty(term))
-                query = query.Where(d => d.Term == term);
-
-            if (!string.IsNullOrEmpty(department) && department != "All")
-                query = query.Where(d => d.Department == department);
-
-            if (!string.IsNullOrEmpty(program) && program != "All")
-                query = query.Where(d => d.Program == program);
-
-            if (!string.IsNullOrEmpty(academicCareer) && academicCareer != "All")
-                query = query.Where(d => d.AcademicCareerDescription == academicCareer);
-
-            if (!string.IsNullOrEmpty(admitType) && admitType != "All")
-                query = query.Where(d => d.AdmitTypeDescription == admitType);
-
-            var result = query.ToList();
-            if (!result.Any())
-                return NotFound();
-
-            return Ok(result);
+            try
+            {
+                var data = await _admissionService.FilterAdmissionDataAsync(term, department, program, academicCareer, admitType);
+                return Ok(data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error filtering admission data");
+                return StatusCode(500, "Internal server error");
+            }
         }
 
-        [HttpGet("summary/{term}")]
-        public ActionResult<AdmissionSummary> GetAdmissionSummary(string term)
+        /// <summary>
+        /// Get admission summary for a specific term
+        /// </summary>
+        [HttpGet("summary/{termCode}")]
+        public async Task<ActionResult<AdmissionSummary>> GetAdmissionSummary(string termCode)
         {
-            var termData = _admissionData.Where(d => d.Term == term).ToList();
-            if (!termData.Any())
-                return NotFound();
-
-            var summary = new AdmissionSummary
+            try
             {
-                Id = 1,
-                TotalApplied = termData.Sum(d => d.TotalApplied),
-                TotalAdmitted = termData.Sum(d => d.TotalAdmitted),
-                TotalDenied = termData.Sum(d => d.TotalDenied),
-                TotalGrossDeposited = termData.Sum(d => d.TotalGrossDeposited),
-                TotalNetDeposited = termData.Sum(d => d.TotalNetDeposited),
-                Term = term
-            };
+                var summary = await _admissionService.GetAdmissionSummaryAsync(termCode);
+                return Ok(summary);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving admission summary for term: {TermCode}", termCode);
+                return StatusCode(500, "Internal server error");
+            }
+        }
 
-            summary.AdmissionRate = summary.TotalApplied > 0 ?
-                (double)summary.TotalAdmitted / summary.TotalApplied * 100 : 0;
+        /// <summary>
+        /// Create new admission data entry
+        /// </summary>
+        [HttpPost]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<ActionResult<AdmissionData>> CreateAdmissionData([FromBody] AdmissionData admissionData)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return BadRequest(ModelState);
 
-            summary.DenialRate = summary.TotalApplied > 0 ?
-                (double)summary.TotalDenied / summary.TotalApplied * 100 : 0;
+                var created = await _admissionService.CreateAdmissionDataAsync(admissionData);
+                return CreatedAtAction(nameof(GetAdmissionDataByTerm),
+                    new { termCode = created.Term.TermCode }, created);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating admission data");
+                return StatusCode(500, "Internal server error");
+            }
+        }
 
-            summary.DepositRate = summary.TotalAdmitted > 0 ?
-                (double)summary.TotalNetDeposited / summary.TotalAdmitted * 100 : 0;
+        /// <summary>
+        /// Update existing admission data
+        /// </summary>
+        [HttpPut("{id}")]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<ActionResult<AdmissionData>> UpdateAdmissionData(int id, [FromBody] AdmissionData admissionData)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                    return BadRequest(ModelState);
 
-            return Ok(summary);
+                var updated = await _admissionService.UpdateAdmissionDataAsync(id, admissionData);
+                return Ok(updated);
+            }
+            catch (ArgumentException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating admission data with ID: {Id}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        /// <summary>
+        /// Delete admission data
+        /// </summary>
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult> DeleteAdmissionData(int id)
+        {
+            try
+            {
+                var deleted = await _admissionService.DeleteAdmissionDataAsync(id);
+                if (!deleted)
+                    return NotFound($"Admission data with ID {id} not found");
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting admission data with ID: {Id}", id);
+                return StatusCode(500, "Internal server error");
+            }
         }
     }
 }
