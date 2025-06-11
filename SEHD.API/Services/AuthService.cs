@@ -46,7 +46,9 @@ namespace SEHD.API.Services
 
 		public async Task<string> GenerateJwtTokenAsync(UserDto user)
 		{
-			var jwtSettings = _configuration.GetSection("JwtSettings");
+            await Task.CompletedTask;
+
+            var jwtSettings = _configuration.GetSection("JwtSettings");
 			var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
 			var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

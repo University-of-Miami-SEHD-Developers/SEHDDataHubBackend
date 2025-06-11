@@ -1,4 +1,7 @@
 // DTOs/LoginDto.cs
+
+using System.ComponentModel.DataAnnotations;
+
 namespace SEHD.API.DTOs
 {
 	public class LoginDto
