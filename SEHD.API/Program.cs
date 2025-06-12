@@ -15,26 +15,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
 builder.Services.AddControllers();
 
-// Entity Framework - choose one based on your needs:
-
-// Option A: Use SQL Server (for production/real database testing)
+// Entity Framework - FORCE IN-MEMORY DATABASE FOR TESTING
+// Comment out SQL Server and use only in-memory for testing
 builder.Services.AddDbContext<SEHDDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// Option B: Use In-Memory Database (for testing without real database)
-// Uncomment this if you want to test without SQL Server connection
-
-if (builder.Environment.IsDevelopment() && args.Contains("--use-memory-db"))
-{
-    builder.Services.AddDbContext<SEHDDbContext>(options =>
-        options.UseInMemoryDatabase("SEHDTestDb"));
-}
-else
-{
-    builder.Services.AddDbContext<SEHDDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-}
-
+    options.UseInMemoryDatabase("SEHDTestDb"));
 
 // JWT Authentication
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -63,7 +47,7 @@ builder.Services.AddAuthentication(options =>
 // Authorization
 builder.Services.AddAuthorization();
 
-// CORS
+// CORS - Updated for testing
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp",
@@ -73,7 +57,8 @@ builder.Services.AddCors(options =>
                 "http://localhost:3000",
                 "http://localhost:5173",
                 "https://localhost:5173",
-                "https://umsehdhub.azurewebsites.net"
+                "http://localhost:5174",
+                "https://localhost:5174"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
@@ -128,12 +113,10 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
-
 // ============================================================================
 // 2. BUILD THE APP (this creates the application instance)
 // ============================================================================
 var app = builder.Build();
-
 
 // ============================================================================
 // 3. MIDDLEWARE PIPELINE CONFIGURATION (after var app = builder.Build())
@@ -150,7 +133,8 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// Remove HTTPS redirect for local testing
+// app.UseHttpsRedirection();
 app.UseCors("AllowReactApp");
 app.UseAuthentication();
 app.UseAuthorization();
@@ -161,30 +145,37 @@ app.MapControllers();
 // ============================================================================
 
 // Initialize database and seed data
-using (var initScope = app.Services.CreateScope()) // Changed from 'scope' to 'initScope'
+using (var initScope = app.Services.CreateScope())
 {
     var context = initScope.ServiceProvider.GetRequiredService<SEHDDbContext>();
+    var logger = initScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
     try
     {
         // Ensure database is created
         context.Database.EnsureCreated();
+        logger.LogInformation("In-memory database created successfully!");
 
-        // Seed initial users if they don't exist (always runs in development)
+        // Seed initial users 
         await SeedInitialData(context);
+        logger.LogInformation("Initial user data seeded successfully!");
 
-        // Conditional test data seeding (only with --seed-data flag)
-        if (app.Environment.IsDevelopment() && args.Contains("--seed-data"))
-        {
-            var seeder = initScope.ServiceProvider.GetRequiredService<ITestDataSeeder>(); // Use initScope here too
-            await seeder.SeedTestDataAsync();
+        // ALWAYS seed test data for in-memory testing
+        var seeder = initScope.ServiceProvider.GetRequiredService<ITestDataSeeder>();
+        await seeder.SeedTestDataAsync();
+        logger.LogInformation("Test data seeding completed successfully!");
 
-            var logger = initScope.ServiceProvider.GetRequiredService<ILogger<Program>>(); // And here
-            logger.LogInformation("Test data seeding completed successfully!");
-        }
+        // Log what data we have
+        var userCount = await context.Users.CountAsync();
+        var admissionCount = await context.AdmissionsData.CountAsync();
+        var deptCount = await context.Departments.CountAsync();
+        var programCount = await context.AcademicPrograms.CountAsync();
+        var termCount = await context.AcademicTerms.CountAsync();
+
+        logger.LogInformation($"Database initialized with: {userCount} users, {deptCount} departments, {programCount} programs, {termCount} terms, {admissionCount} admission records");
     }
     catch (Exception ex)
     {
-        var logger = initScope.ServiceProvider.GetRequiredService<ILogger<Program>>(); // And here
         logger.LogError(ex, "An error occurred while initializing the database");
     }
 }
@@ -197,7 +188,6 @@ app.Run();
 // ============================================================================
 // 6. HELPER METHODS (after app.Run())
 // ============================================================================
-
 
 // Helper method to seed initial users (runs every time in development)
 static async Task SeedInitialData(SEHDDbContext context)
