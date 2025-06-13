@@ -152,12 +152,20 @@ using (var initScope = app.Services.CreateScope())
 
     try
     {
+        // FORCE DELETE AND RECREATE DATABASE IN DEVELOPMENT
+        if (app.Environment.IsDevelopment())
+        {
+            logger.LogInformation("Development environment detected - recreating database...");
+            await context.Database.EnsureDeletedAsync();
+            logger.LogInformation("Database deleted");
+        }
+
         // Ensure database is created
-        context.Database.EnsureCreated();
+        await context.Database.EnsureCreatedAsync();
         logger.LogInformation("In-memory database created successfully!");
 
         // Seed initial users 
-        await SeedInitialData(context);
+        await SeedInitialData(context, logger);
         logger.LogInformation("Initial user data seeded successfully!");
 
         // ALWAYS seed test data for in-memory testing
@@ -173,6 +181,13 @@ using (var initScope = app.Services.CreateScope())
         var termCount = await context.AcademicTerms.CountAsync();
 
         logger.LogInformation($"Database initialized with: {userCount} users, {deptCount} departments, {programCount} programs, {termCount} terms, {admissionCount} admission records");
+
+        // Verify we have Fall24 data specifically
+        var fall24Count = await context.AdmissionsData
+            .Include(a => a.Term)
+            .Where(a => a.Term.TermCode == "Fall24")
+            .CountAsync();
+        logger.LogInformation($"Fall24 admission records: {fall24Count}");
     }
     catch (Exception ex)
     {
@@ -190,11 +205,12 @@ app.Run();
 // ============================================================================
 
 // Helper method to seed initial users (runs every time in development)
-static async Task SeedInitialData(SEHDDbContext context)
+static async Task SeedInitialData(SEHDDbContext context, ILogger logger)
 {
     // Check if users already exist
     if (!await context.Users.AnyAsync())
     {
+        logger.LogInformation("Seeding initial users...");
         var users = new[]
         {
             new SEHD.API.Models.User
@@ -219,5 +235,6 @@ static async Task SeedInitialData(SEHDDbContext context)
 
         context.Users.AddRange(users);
         await context.SaveChangesAsync();
+        logger.LogInformation($"Seeded {users.Length} initial users");
     }
 }
