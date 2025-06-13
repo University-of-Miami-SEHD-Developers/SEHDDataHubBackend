@@ -1,4 +1,4 @@
-﻿// Controllers/AdmissionDataController.cs (Updated)
+﻿// Controllers/AdmissionsDataController.cs (Fixed routing)
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SEHD.API.DTOs;
@@ -10,12 +10,12 @@ namespace SEHD.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class AdmissionDataController : ControllerBase
+    public class AdmissionsDataController : ControllerBase  // Changed from AdmissionDataController
     {
         private readonly IAdmissionService _admissionService;
-        private readonly ILogger<AdmissionDataController> _logger;
+        private readonly ILogger<AdmissionsDataController> _logger;
 
-        public AdmissionDataController(IAdmissionService admissionService, ILogger<AdmissionDataController> logger)
+        public AdmissionsDataController(IAdmissionService admissionService, ILogger<AdmissionsDataController> logger)
         {
             _admissionService = admissionService;
             _logger = logger;
